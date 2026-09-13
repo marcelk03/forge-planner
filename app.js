@@ -15,7 +15,7 @@ delete timer.earned;
 function upgradeHours(v){return v.N < MAX_LEVEL ? (WORKBOOK.levels.find(x=>x.level===v.N+1)?.hours??0)*v.B : 0;}
 function remaining(){return timer.end===null?timer.remaining:Math.max(0,timer.end-Date.now());}
 function calculate(v,started=false,remainingMs=0,targetCurrentMs=remainingMs){
- const gold=v.D+v.G*86400+v.J/7+v.M, hammers=v.E+v.H*1440+v.K/7+v.L/7;
+ const gold=v.D+v.G*86400+v.J/7+v.M+v.Q, hammers=v.E+v.H*1440+v.K/7+v.L/7+v.P;
  const perHammer=20*v.C*1.01**v.I/v.F;
  const nextLevel=v.N+(started?2:1);
  const nextCost=(WORKBOOK.levels.find(x=>x.level===nextLevel)?.cost??0)*v.A;
