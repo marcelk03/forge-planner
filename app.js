@@ -8,31 +8,38 @@ const oldValues=read('forge-inputs',null);
 let values={...defaults,...read('forge-inputs-v2',oldValues?{...oldValues,N:Math.max(1,oldValues.N-1)}:defaults)};
 let timer=read('forge-upgrade-v2',{level:values.N,started:false,remaining:0,end:null});
 if(!timer||timer.level!==values.N||typeof timer.started!=='boolean'||!Number.isFinite(timer.remaining)||timer.remaining<0||(timer.end!==null&&!Number.isFinite(timer.end)))timer={level:values.N,started:false,remaining:0,end:null};
+// Previous bank and automatic earnings do not affect the split targets.
+delete timer.earned;
 function upgradeHours(v){return (WORKBOOK.levels.find(x=>x.level===v.N+1)?.hours??0)*v.B;}
 function remaining(){return timer.end===null?timer.remaining:Math.max(0,timer.end-Date.now());}
 function calculate(v,started=false,remainingMs=0){
- const gold=v.D+v.G*86400+v.J/7+v.M, hammers=v.H*1440+v.K/7+v.L/7;
+ const gold=v.D+v.G*86400+v.J/7+v.M, hammers=v.E+v.H*1440+v.K/7+v.L/7;
  const perHammer=20*v.C*1.01**v.I/v.F;
- const cutoff=v.N+(started?1:0);
+ const nextLevel=v.N+(started?2:1);
+ const nextCost=(WORKBOOK.levels.find(x=>x.level===nextLevel)?.cost??0)*v.A;
+ const cutoff=nextLevel;
  const cost=WORKBOOK.levels.filter(x=>x.level>cutoff).reduce((a,x)=>a+x.cost,0)*v.A+3000000*(3-v.O);
- const days=WORKBOOK.levels.filter(x=>x.level>cutoff).reduce((a,x)=>a+x.hours,0)*v.B/24+(started?remainingMs/86400000:0);
- const generated=gold*days, totalHammers=hammers*days, hammerGold=totalHammers*perHammer, missing=cost-generated-hammerGold;
- return [gold,hammers,perHammer,cost,days,generated,totalHammers,hammerGold,missing,missing/perHammer];
+ const days=WORKBOOK.levels.filter(x=>x.level>v.N+1&&x.level<140).reduce((a,x)=>a+x.hours,0)*v.B/24+(v.N+1<140?(started?remainingMs/86400000:upgradeHours(v)/24):0);
+ const projectionDays=WORKBOOK.levels.filter(x=>x.level>cutoff&&x.level<140).reduce((a,x)=>a+x.hours,0)*v.B/24;
+ const generated=gold*projectionDays, totalHammers=hammers*projectionDays, hammerGold=totalHammers*perHammer, missing=cost-generated-hammerGold;
+ return [gold,hammers,perHammer,nextCost,days,generated,totalHammers,hammerGold,missing+nextCost,Math.max(0,missing/perHammer)];
 }
-const labels=['Gold per day','Hammers per day','Gold per hammer','Gold to max','Remaining days to max','Gold generated to max','Hammers generated to max','Gold from hammers to max','Missing gold','Missing gold in hammers'];
+const labels=['Gold per day','Hammers per day','Gold per hammer','Cash for next unpaid upgrade','Time remaining to max','Gold earned after cash upgrade','Hammers earned after cash upgrade','Gold from those hammers','Missing gold till max','Hammers for remaining upgrades'];
 function render(){
- const valid=$('inputs').checkValidity();
+ const valid=$('inputs').checkValidity()&&$('input-N').checkValidity();
  const results=calculate(values,timer.started,remaining());
+ const cashLevel=values.N+(timer.started?2:1);
+ labels[3]=cashLevel<=140?`Cash for ${cashLevel-1} -> ${cashLevel}`:'Cash for next upgrade (none)';
  $('error').textContent=valid&&results.every(Number.isFinite)?'':'Enter valid numbers in every input to calculate.';
- $('results').innerHTML=labels.map((label,i)=>`<div class="metric"><small>${label}</small><strong>${valid&&Number.isFinite(results[i])?format(results[i]):'—'}</strong></div>`).join('');
+ $('results').innerHTML=[0,1,2,4,5,6,7,3,9].map(i=>`<div class="metric${i===3||i===9?' target':''}"><small>${labels[i]}</small><strong>${valid&&Number.isFinite(results[i])?(i===4?durationText(results[i]*86400000):format(i===9?Math.ceil(results[i]):results[i])):'—'}</strong></div>`).join('');
 }
 for(const item of WORKBOOK.inputs){
  const wrapper=document.createElement('div');
  const integer=['I','N','O'].includes(item.key);
  wrapper.innerHTML=`<label for="input-${item.key}">${item.label}</label><input id="input-${item.key}" type="number" required min="${['C','F'].includes(item.key)?'0.000001':integer&&item.key!=='O'?'1':'0'}" ${item.key==='O'?'max="3"':item.key==='N'?'max="140"':''} step="${integer?'1':'any'}">`;
  const input=wrapper.querySelector('input');input.value=values[item.key];
- input.addEventListener('input',()=>{values[item.key]=input.valueAsNumber;if(item.key==='N')resetUpgrade();else tick();if($('inputs').checkValidity())save('forge-inputs-v2',values);});
- $('inputs').append(wrapper);
+ input.addEventListener('input',()=>{values[item.key]=input.valueAsNumber;if(item.key==='N')resetUpgrade();else tick();if($('inputs').checkValidity()&&$('input-N').checkValidity())save('forge-inputs-v2',values);});
+ $(item.key==='N'?'forge-level':'inputs').append(wrapper);
 }
 $('inputs').addEventListener('submit',e=>e.preventDefault());
 $('defaults').onclick=()=>{values={...defaults};for(const item of WORKBOOK.inputs)$('input-'+item.key).value=values[item.key];save('forge-inputs-v2',values);resetUpgrade();};
@@ -47,6 +54,7 @@ function durationText(ms){
  return `${Math.floor(s/86400)}d ${Math.floor(s%86400/3600)}h ${Math.floor(s%3600/60)}m ${s%60}s`;
 }
 function resetUpgrade(){
+ 
  timer={level:values.N,started:false,remaining:0,end:null};persistTimer();
  $('duration').setCustomValidity('');syncTimerInputs();tick();
 }
@@ -55,12 +63,13 @@ function syncTimerInputs(){
  $('duration').value=durationText(timer.started?remaining():upgradeHours(values)*3600000);
 }
 function tick(){
+ 
  const canUpgrade=Number.isInteger(values.N)&&values.N>=1&&values.N<140;
  if(timer.started&&timer.end!==null&&remaining()===0){timer.end=null;timer.remaining=0;persistTimer();}
  const ms=timer.started?remaining():upgradeHours(values)*3600000;
- $('clock').textContent=Number.isFinite(ms)?durationText(ms):'?';
- $('upgrade-title').textContent=canUpgrade?`Forge ${values.N} ? ${values.N+1}`:'No further forge upgrade';
- $('timer-status').textContent=!canUpgrade?'Maximum forge level reached.':!timer.started?'Not started. Full upgrade time and cost are included.':timer.end!==null?'Upgrade finishes '+new Date(timer.end).toLocaleString():remaining()>0?'Countdown paused.':'Upgrade time is complete. Update Forge Level when collected.';
+ $('clock').textContent=!timer.started?'Not started':Number.isFinite(ms)?durationText(ms):'-';
+ $('upgrade-title').textContent=canUpgrade?`Forge ${values.N} -> ${values.N+1}`:'No further forge upgrade';
+ $('timer-status').textContent=!canUpgrade?'Maximum forge level reached.':!timer.started?'Not started. Save the cash target to begin this upgrade.':timer.end!==null?'Upgrade finishes '+new Date(timer.end).toLocaleString():remaining()>0?'Countdown paused.':'Upgrade time is complete. Update Forge Level when collected.';
  $('upgrade-state').disabled=!canUpgrade;
  $('duration').disabled=!timer.started||!canUpgrade;
  $('start').disabled=!timer.started||timer.end!==null||remaining()<=0;
@@ -69,6 +78,7 @@ function tick(){
  render();
 }
 function setDuration(ms){
+ 
  timer={level:values.N,started:true,remaining:ms,end:ms>0?Date.now()+ms:null};
  persistTimer();tick();
 }
@@ -87,4 +97,4 @@ $('duration').addEventListener('input',()=>{
 $('start').onclick=()=>{if(!$('duration').reportValidity()||!timer.started||remaining()<=0)return;timer.end=Date.now()+timer.remaining;persistTimer();tick();};
 $('pause').onclick=()=>{timer.remaining=remaining();timer.end=null;persistTimer();syncTimerInputs();tick();};
 $('use-level').onclick=()=>{if(!$('inputs').checkValidity())return;$('duration').setCustomValidity('');setDuration(upgradeHours(values)*3600000);syncTimerInputs();};
- syncTimerInputs();tick();setInterval(tick,1000);
+syncTimerInputs();tick();setInterval(tick,1000);
