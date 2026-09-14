@@ -1,22 +1,143 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forge planner</title><link rel="stylesheet" href="style.css"></head>
-<body><main>
-<header><h1>Forge planner</h1><p>Minmax your gold, hammers, and upgrade time.</p></header>
-<section class="timer panel" aria-label="Forge upgrade">
-<div><h2>Forge upgrade</h2><div id="forge-level"></div><label for="upgrade-state">Upgrade status</label><select id="upgrade-state"><option value="not-started">Not started</option><option value="started">Started</option></select></div>
-<div><h2 id="upgrade-title"></h2><div id="clock">00:00:00</div><p id="timer-status" role="status"></p><label for="duration">Time left on this upgrade</label><input id="duration" placeholder="e.g. 2d 3h 15m 30s"><div class="buttons"><button id="start">Resume</button><button id="pause" class="secondary">Pause</button><button id="use-level" class="secondary">Use full duration</button></div></div>
-</section>
-<div class="layout"><section><div class="section-title"><h2>Inputs &amp; bonuses</h2><button id="defaults" class="link">Restore defaults</button></div>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forge planner</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Forge planner</h1>
+        <p>Minmax your gold, hammers, and upgrade time.</p>
+      </header>
 
-<p class="hint">Enter multipliers as decimals: 0.87 = 87%.</p><form id="inputs"></form><p id="save-status" role="status" class="hint"></p></section>
-<section><div class="section-title"><h2>Projection to max</h2><span class="hint">Live while running</span></div><p id="error" role="alert"></p><div id="results"></div>
-<details><summary>How it works &amp; level table</summary><div class="notes">
-<p><strong>Cash:</strong> The cash target is the full gold price of the next unpaid forge upgrade. At level 20, Not started reserves cash for 20 -&gt; 21. When that upgrade is Started and paid, the cash target moves to 21 -&gt; 22.</p>
+      <section class="timer panel" aria-label="Forge upgrade">
+        <div>
+          <h2>Forge upgrade</h2>
+          <div id="forge-level"></div>
 
-<p><strong>Hammers:</strong> The hammer target covers costs after the cash-reserved upgrade, while crediting gold and hammers generated during the current and cash-reserved upgrades. For cash 21 -&gt; 22, it covers 22 -&gt; 23 onward, while income from 21 -&gt; 22 and the later upgrades helps pay those costs. Production stops at 139 -&gt; 140. Hammers are rounded up, with a minimum of zero.</p>
-<p><strong>Time:</strong> Total time to max includes the current countdown and upgrades through 139 -&gt; 140. Level 140 is the maximum: its duration is not included, and no income after level 140 is counted because it cannot help maxing. The cash and hammer targets stay fixed as the current countdown runs. Changing level, upgrade status, costs, or income bonuses recalculates them. No resources are automatically credited. The projection assumes continuous upgrades and average income; intermediate cash availability is not guaranteed.</p>
-<p><strong>Rates:</strong> Daily gold = Hammer Thief Gold + Offline Gold &times; 86,400 + League Gold / 7 + Clan Gold + Stepping Stone Gold. Daily hammers = Hammer Thief Hammers + Offline Hammer &times; 1,440 + (League Hammer + Clan Hammer) / 7 + Stepping Stone Hammers. Gold per hammer = 20 &times; Sell Price &times; 1.01<sup>Max Level</sup> / Free Forge.</p>
-<p><strong>Target:</strong> Costs include the payment that reaches forge level 140. Time and income stop at 139 -&gt; 140; row 140 has no post-upgrade production. Forge Cost and Forge Timer multiply base costs and durations. Max Level affects gold per hammer. Each remaining ascension, up to three, adds 3,000,000 gold. Update Forge Level after an upgrade completes.</p>
-</div><div class="table-scroll"><table><thead><tr><th>Level</th><th>Base gold cost</th><th>Base hours</th></tr></thead><tbody id="levels"></tbody></table></div></details>
-</section></div><footer>Inputs and timers are saved in this browser. They do not sync across devices.</footer>
-</main><script src="data.js"></script><script src="app.js"></script></body></html>
+          <label for="upgrade-state">Upgrade status</label>
+          <select id="upgrade-state">
+            <option value="not-started">Not started</option>
+            <option value="started">Started</option>
+          </select>
+        </div>
+
+        <div>
+          <h2 id="upgrade-title"></h2>
+          <div id="clock">00:00:00</div>
+          <p id="timer-status" role="status"></p>
+
+          <label for="duration">Time left on this upgrade</label>
+          <input id="duration" placeholder="e.g. 2d 3h 15m 30s" />
+
+          <div class="buttons">
+            <button id="start">Resume</button>
+            <button id="pause" class="secondary">Pause</button>
+            <button id="use-level" class="secondary">
+              Use full duration
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <section>
+          <div class="section-title">
+            <h2>Inputs &amp; bonuses</h2>
+            <button id="defaults" class="link">Restore defaults</button>
+          </div>
+
+          <p class="hint">Enter multipliers as decimals: 0.87 = 87%.</p>
+          <form id="inputs"></form>
+          <p id="save-status" role="status" class="hint"></p>
+        </section>
+
+        <section>
+          <div class="section-title">
+            <h2>Projection to max</h2>
+            <span class="hint">Live while running</span>
+          </div>
+
+          <p id="error" role="alert"></p>
+          <div id="results"></div>
+
+          <details>
+            <summary>How it works &amp; level table</summary>
+            <div class="notes">
+              <p>
+                <strong>Cash:</strong> The cash target is the full gold price
+                of the next unpaid forge upgrade. At level 20, Not started
+                reserves cash for 20 -&gt; 21. When that upgrade is Started and
+                paid, the cash target moves to 21 -&gt; 22.
+              </p>
+
+              <p>
+                <strong>Hammers:</strong> The hammer target covers costs after
+                the cash-reserved upgrade, while crediting gold and hammers
+                generated during the current and cash-reserved upgrades. For
+                cash 21 -&gt; 22, it covers 22 -&gt; 23 onward, while income from
+                21 -&gt; 22 and the later upgrades helps pay those costs.
+                Production stops at 139 -&gt; 140. Hammers are rounded up, with a
+                minimum of zero.
+              </p>
+
+              <p>
+                <strong>Time:</strong> Total time to max includes the current
+                countdown and upgrades through 139 -&gt; 140. Level 140 is the
+                maximum: its duration is not included, and no income after
+                level 140 is counted because it cannot help maxing. The cash
+                and hammer targets stay fixed as the current countdown runs.
+                Changing level, upgrade status, costs, or income bonuses
+                recalculates them. No resources are automatically credited. The
+                projection assumes continuous upgrades and average income;
+                intermediate cash availability is not guaranteed.
+              </p>
+
+              <p>
+                <strong>Rates:</strong> Daily gold = Hammer Thief Gold +
+                Offline Gold &times; 86,400 + League Gold / 7 + Clan Gold +
+                Stepping Stone Gold. Daily hammers = Hammer Thief Hammers +
+                Offline Hammer &times; 1,440 + (League Hammer + Clan Hammer) / 7
+                + Stepping Stone Hammers. Gold per hammer = 20 &times; Sell Price
+                &times; 1.01<sup>Max Level</sup> / Free Forge.
+              </p>
+
+              <p>
+                <strong>Target:</strong> Costs include the payment that reaches
+                forge level 140. Time and income stop at 139 -&gt; 140; row 140
+                has no post-upgrade production. Forge Cost and Forge Timer
+                multiply base costs and durations. Max Level affects gold per
+                hammer. Each remaining ascension, up to three, adds 3,000,000
+                gold. Update Forge Level after an upgrade completes.
+              </p>
+            </div>
+
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Level</th>
+                    <th>Base gold cost</th>
+                    <th>Base hours</th>
+                  </tr>
+                </thead>
+                <tbody id="levels"></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      </div>
+
+      <footer>
+        Inputs and timers are saved in this browser. They do not sync across
+        devices.
+      </footer>
+    </main>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
